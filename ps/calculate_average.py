@@ -2,7 +2,18 @@
 
 import sys
 import os
+import json
 from datetime import datetime
+
+
+def is_json_file(file_path):
+    with open(file_path, "r") as f:
+        try:
+            json.load(f)
+            return True
+        except json.JSONDecodeError:
+            return False
+
 
 if len(sys.argv) < 2:
     print("Error: Please provide the file name to process as a command-line argument")
@@ -17,10 +28,15 @@ if not os.path.isfile(input_file):
 
 num_cpu_cores = os.cpu_count()
 
-with open(input_file, "r") as f:
-    lines = f.readlines()
-
-lines = lines[1:]  # Remove header
+if is_json_file(input_file):
+    with open(input_file, "r") as f:
+        data = json.load(f)
+    data = [{"CPU": r["CPU"], "Memory": r["Memory"], "Disk Read": r["Disk Read"], "Disk Write": r["Disk Write"]} for r in data]
+else:
+    with open(input_file, "r") as f:
+        lines = f.readlines()
+    lines = lines[1:]  # Remove header
+    data = [{"CPU": float(cols[1]), "Memory": float(cols[2]), "Disk Read": float(cols[3]), "Disk Write": float(cols[4])} for cols in (l.strip().split(", ") for l in lines)]
 
 cpu_total = 0
 mem_total = 0
@@ -30,16 +46,19 @@ count = 0
 
 start_time = datetime.now()
 
-for line in lines:
-    _, cpu, mem, disk_read, disk_write = line.strip().split(", ")
+for record in data:
+    cpu = float(record["CPU"])
+    mem = float(record["Memory"])
+    disk_read = float(record["Disk Read"])
+    disk_write = float(record["Disk Write"])
 
-    cpu_total += float(cpu)
-    mem_total += float(mem)
-    disk_read_total += float(disk_read)
-    disk_write_total += float(disk_write)
+    cpu_total += cpu
+    mem_total += mem
+    disk_read_total += disk_read
+    disk_write_total += disk_write
 
     count += 1
-    progress = (count / len(lines)) * 100
+    progress = (count / len(data)) * 100
     print(f"Processing: {progress:.2f}%", end="\r")
 
 print("")  # Move to the next line after the progress bar
@@ -58,8 +77,4 @@ if count > 0:
     print(f"Average disk write rate: {disk_write_avg:.2f} KB/s")
 else:
     print("No data available to calculate averages.")
-
-end_time = datetime.now()
-elapsed_time = end_time - start_time
-print(f"Elapsed time: {elapsed_time}")
 
